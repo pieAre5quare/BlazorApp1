@@ -1,0 +1,82 @@
+﻿@page "/counter"
+@using Microsoft.AspNetCore.SignalR.Client;
+@using System.Threading.Channels;
+@using NAudio.Wave;
+
+
+<PageTitle>Counter</PageTitle>
+
+<h1>Counter</h1>
+
+<p role="status">Current count: @currentCount</p>
+
+<button class="btn btn-primary" @onclick="IncrementCount">Click me</button>
+
+<button class="btn btn-primary" @onclick="CreateChannel">CreateChannel</button>
+<button class="btn btn-primary" @onclick="StartStream">Start Stream</button>
+<button class="btn btn-primary" @onclick="StopStream">Stop Stream</button>
+<button class="btn btn-primary" @onclick="RecieveStream">Recieve Stream</button>
+
+@code {
+    public HubConnection SignalRClient { get; set; } = new HubConnectionBuilder()
+                                                                    .WithUrl("https://localhost:7041/StreamingHub")
+                                                                    .Build();
+
+    private int currentCount = 0;
+    private Channel<int>? ThisChannel { get; set; }
+    private bool IsStreaming { get; set; } = false;
+
+    private void IncrementCount()
+    {
+        currentCount++;
+    }
+
+    public void Test()
+    {
+        var test = new WaveOutEvent();
+    }
+
+    private async Task StartStream()
+    {
+        if (SignalRClient.State != HubConnectionState.Connected)
+            await SignalRClient.StartAsync();
+        IsStreaming = true;
+        var rand = new Random();
+        while (IsStreaming)
+        {
+            if (ThisChannel == null)
+                return;
+            await ThisChannel.Writer.WriteAsync(rand.Next(100));
+            await Task.Delay(1000);
+        }
+    }
+
+    private void StopStream()
+    {
+        IsStreaming = false;
+    }
+
+    private async Task CreateChannel()
+    {
+        if (SignalRClient.State != HubConnectionState.Connected)
+            await SignalRClient.StartAsync();
+        ThisChannel = Channel.CreateUnbounded<int>();
+        await SignalRClient.SendAsync("UploadStream", ThisChannel.Reader);
+    }
+
+    private async Task RecieveStream()
+    {
+        if (SignalRClient.State != HubConnectionState.Connected)
+            await SignalRClient.StartAsync();
+        var channelReader = await SignalRClient.StreamAsChannelAsync<int>(
+            "GetStream");
+        while (await channelReader.WaitToReadAsync())
+        {
+            while(channelReader.TryRead(out var count))
+            {
+                currentCount = count;
+                Console.WriteLine($"{count}");
+            }
+        }
+    }
+}
