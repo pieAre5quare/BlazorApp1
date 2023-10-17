@@ -15,6 +15,9 @@
 }
 else
 {
+
+    <button class="btn btn-primary" @onclick="Calculate">Recieve Stream</button>
+    <p role="status">Current Result: @Result</p>
     <table class="table">
         <thead>
             <tr>
@@ -41,8 +44,44 @@ else
 @code {
     private WeatherForecast[]? forecasts;
 
+    private int TotalSelected { get; set; } = 17;
+    private int NumberSuccess { get; set; } = 11;
+    private double SuccessChance { get; set; } = .45;
+    private bool IsExact { get; set; } = true;
+    private double Result { get; set; } = 0;
+
+
     protected override async Task OnInitializedAsync()
     {
         forecasts = await ForecastService.GetForecastAsync(DateTime.Now);
+    }
+
+    private void Calculate()
+    {
+        if (IsExact)
+            Result = RunFormula(NumberSuccess);
+        else
+        {
+            var result = 0.0;
+            for (int i = 0; i < NumberSuccess; i++)
+                result += RunFormula(i);
+
+                Result = result;
+        }
+    }
+
+    private double RunFormula(int numberSuccess)
+    {
+        var firstPart = 
+            Factorial(TotalSelected) / (Factorial(numberSuccess) * Factorial((TotalSelected - numberSuccess)));
+        return firstPart * (Math.Pow(SuccessChance, NumberSuccess)) * (Math.Pow((1 - SuccessChance), (TotalSelected - numberSuccess)));
+    }
+
+    private int Factorial(int num)
+    {
+        var result = 1;
+        for (int i = num; i > 0; i--)
+            result *= i;
+        return result;
     }
 }

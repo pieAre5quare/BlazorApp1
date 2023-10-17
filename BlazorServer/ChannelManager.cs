@@ -4,6 +4,6 @@ namespace BlazorServer
 {
     public class ChannelManager
     {
-        public ChannelReader<int>? Channel { get; set; }
+        public ChannelReader<byte>? Channel { get; set; }
     }
 }

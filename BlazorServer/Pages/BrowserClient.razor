@@ -1,0 +1,130 @@
+﻿@page "/browser"
+@using Microsoft.AspNetCore.SignalR.Client;
+
+<h3>BrowserClient</h3>
+
+<div class="row">
+    <div class="col">
+        <button class="btn btn-primary" @onclick="CreateStreamClicked">Create Stream</button>
+        <button class="btn btn-primary" @onclick="GetStreamClicked">Get Stream</button>
+        @* <button class="btn btn-primary" @onclick="PauseButtonClicked">Pause</button>
+        <button class="btn btn-primary" @onclick="StopButtonClicked">Stop</button> *@
+        <div id="audioContainer">
+            <audio id="soundTest" controls src=""></audio>
+        </div>
+    </div>
+</div>
+
+@code {
+    enum StreamingPlaybackState
+    {
+        Stopped,
+        Playing,
+        Buffering,
+        Paused
+    }
+    [Inject]
+    public IJSRuntime JS { get; set; }
+
+    public HubConnection SignalRClient { get; set; } = new HubConnectionBuilder()
+                                                                .WithUrl("https://localhost:7041/StreamingHub")
+                                                                .Build();
+
+
+    private volatile StreamingPlaybackState playbackState;
+    private volatile bool fullyDownloaded;
+    private string AudioFileName { get; set; } = @"Free_Test_Data_500KB_MP3.mp3";
+    private Guid StreamId { get; set; } = Guid.NewGuid();
+    private MemoryStream LocalAudioStream { get; set; } = new MemoryStream(new byte[512457]);
+
+
+    // protected override async Task OnInitializedAsync()
+    // {
+    //     await base.OnInitializedAsync();
+    //     await SignalRClient.StartAsync();
+
+    //     using var streamRef = new DotNetStreamReference(stream: new ReadFullyStream(LocalAudioStream));
+    //     await JS.InvokeVoidAsync("PlayAudioFileStream", streamRef);
+
+    //     SignalRClient.On<byte>("RecieveStream", (thisByte) =>
+    //     {
+
+    //         LocalAudioStream.WriteByte(thisByte);
+    //         Console.WriteLine(thisByte);
+
+    //     });
+    // }
+
+    private int BytesRead { get; set; } = 0;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            await SignalRClient.StartAsync();
+            LocalAudioStream.Position = 0;
+            using var streamRef = new DotNetStreamReference(stream: new ReadFullyStream(LocalAudioStream));
+            await JS.InvokeVoidAsync("PlayAudioFileStream", streamRef);
+
+            SignalRClient.On<byte>("RecieveStream", (thisByte) =>
+            {
+                LocalAudioStream.Position = BytesRead;
+                BytesRead++;
+                LocalAudioStream.WriteByte(thisByte);
+                // LocalAudioStream.WriteByte(thisByte);
+                Console.WriteLine(thisByte);
+
+            });
+        }
+        await base.OnAfterRenderAsync(firstRender);
+    }
+
+
+    public async Task CreateStreamClicked()
+    {
+        // await SignalRClient.StartAsync();
+        await SignalRClient.InvokeAsync("RequestStream", StreamId, AudioFileName); //client id as well eventually
+
+
+
+        // if (playbackState == StreamingPlaybackState.Stopped)
+        // {
+        //     playbackState = StreamingPlaybackState.Buffering;
+        //     // bufferedWaveProvider = null;
+
+        //     ThreadPool.QueueUserWorkItem(async x =>
+        //     {
+        //         await StreamMp3();
+        //     });
+        //     //timer1.Enabled = true;
+        // }
+        // else if (playbackState == StreamingPlaybackState.Paused)
+        // {
+        //     playbackState = StreamingPlaybackState.Buffering;
+        // }
+    }
+
+    private async Task GetStreamClicked()
+    {
+
+
+        var cancellationTokenSource = new CancellationTokenSource();
+        var channel = await SignalRClient.StreamAsChannelAsync<byte>("GetStream", cancellationTokenSource.Token);
+        var bytes = new byte[512457];
+        while (await channel.WaitToReadAsync())
+        {
+            // Read all currently available data synchronously, before waiting for more data
+            while (channel.TryRead(out var thisByte))
+            {
+                Console.WriteLine(thisByte);
+                // var memoryStream = new MemoryStream(bytes);
+                // using var streamRef = new DotNetStreamReference(stream: memoryStream);
+                // await JS.InvokeVoidAsync("PlayAudioFileStream", streamRef);
+                // foreach (var item in count)
+                //     Console.WriteLine($"{item}");
+                // destinationStream.WriteByte(count);
+            }
+        }
+        await InvokeAsync(() => StateHasChanged());
+    }
+}

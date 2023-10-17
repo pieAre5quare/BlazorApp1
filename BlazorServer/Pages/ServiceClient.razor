@@ -1,0 +1,78 @@
+﻿@page "/service"
+@using Microsoft.AspNetCore.SignalR.Client;
+@using System.Threading.Channels;
+
+<h3>ServiceClient</h3>
+
+<div class="row">
+    <div class="col">
+        @if(AudioChannel != null)
+        {
+            <button class="btn btn-primary" @onclick="SendDataClicked">Send Data</button>
+            
+        }
+        @* <button class="btn btn-primary" @onclick="PauseButtonClicked">Pause</button>
+        <button class="btn btn-primary" @onclick="StopButtonClicked">Stop</button> *@
+        <div id="audioContainer">
+            <audio id="soundTest" controls src=""></audio>
+        </div>
+    </div>
+</div>
+
+@code {
+
+    public HubConnection SignalRClient { get; set; } = new HubConnectionBuilder()
+                                                                .WithUrl("https://localhost:7041/StreamingHub")
+                                                                .Build();
+    public Channel<byte>? AudioChannel { get; set; }
+    [Inject]
+    public IWebHostEnvironment _webHostEnvironment { get; set; }
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        await base.OnInitializedAsync();
+        await SignalRClient.StartAsync();
+
+        SignalRClient.On<Guid,string>("StartStream", async (streamId, fileName) =>
+        {
+            await StartStream(streamId, fileName);
+        } );
+    }
+
+    public async Task StartStream(Guid streamId, string fileName)
+    {
+
+
+        AudioChannel = Channel.CreateUnbounded<byte>();
+        await SignalRClient.SendAsync("UploadStream", AudioChannel.Reader);
+
+        var test = Path.Combine(_webHostEnvironment.ContentRootPath, "Free_Test_Data_500KB_MP3.mp3");
+        var test2 = File.Exists(test);
+        var bytes = File.ReadAllBytes(test);
+        var cancellationTokenSource = new CancellationTokenSource();
+        foreach (var item in bytes)
+        {
+            await AudioChannel.Writer.WriteAsync(item, cancellationTokenSource.Token);
+        }
+
+        await InvokeAsync(StateHasChanged);
+
+
+
+    }
+
+    public async Task SendDataClicked()
+    {
+        var test = Path.Combine(_webHostEnvironment.ContentRootPath, "Free_Test_Data_500KB_MP3.mp3");
+        var test2 = File.Exists(test);
+        var bytes = File.ReadAllBytes(test);
+        var cancellationTokenSource = new CancellationTokenSource();
+        foreach(var item in bytes)
+        {
+            await AudioChannel.Writer.WriteAsync(item, cancellationTokenSource.Token);
+        }
+
+    }
+}

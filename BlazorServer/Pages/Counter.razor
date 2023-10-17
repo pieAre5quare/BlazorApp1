@@ -1,7 +1,7 @@
 ﻿@page "/counter"
 @using Microsoft.AspNetCore.SignalR.Client;
 @using System.Threading.Channels;
-@using NAudio.Wave;
+@* @using NAudio.Wave; *@
 
 
 <PageTitle>Counter</PageTitle>
@@ -33,7 +33,7 @@
 
     public void Test()
     {
-        var test = new WaveOutEvent();
+        // var test = new WaveOutEvent();
     }
 
     private async Task StartStream()
